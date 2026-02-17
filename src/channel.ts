@@ -60,20 +60,9 @@ export const xmtpChannel = {
      * Start an XMTP account: create client, start streaming, register in shared registry.
      * Blocks on abort signal to keep the channel alive.
      */
-    async startAccount(ctx: {
-      account: ResolvedXmtpAccount;
-      signal: AbortSignal;
-      logger: {
-        info: (msg: string) => void;
-        warn: (msg: string) => void;
-        error: (msg: string) => void;
-        debug: (msg: string) => void;
-      };
-      stateDir?: string;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      dispatch: (envelope: any) => void;
-    }): Promise<void> {
-      const { account, signal, logger, stateDir, dispatch } = ctx;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    async startAccount(ctx: any): Promise<void> {
+      const { account, abortSignal, log } = ctx;
 
       if (!isAccountConfigured(account)) {
         throw new Error(
@@ -82,14 +71,29 @@ export const xmtpChannel = {
         );
       }
 
-      logger.info(`Starting XMTP account: ${describeAccount(account)}`);
+      log?.info(`Starting XMTP account: ${describeAccount(account)}`);
+
+      // Try to get dispatch from the plugin runtime
+      let dispatch: ((envelope: unknown) => void) | undefined;
+      try {
+        const runtime = getRuntime();
+        dispatch = runtime.dispatch?.bind(runtime);
+      } catch {
+        // runtime not available — will log inbound messages instead
+      }
+
+      const logger = {
+        info: (msg: string) => log?.info(msg),
+        warn: (msg: string) => log?.warn(msg),
+        error: (msg: string) => log?.error(msg),
+        debug: (msg: string) => log?.debug?.(msg),
+      };
 
       const client = new XmtpClient({
         walletKey: account.walletKey,
         dbEncryptionKey: account.dbEncryptionKey,
         env: account.env ?? "production",
         accountId: account.accountId,
-        stateDir,
         debug: account.debug,
         logger,
         onMessage: (msg: InboundXmtpMessage) => {
@@ -103,27 +107,29 @@ export const xmtpChannel = {
       setClient(account.accountId, client);
 
       const address = client.getAddress();
-      logger.info(`XMTP account "${account.accountId}" connected (address: ${address})`);
+      log?.info(`XMTP account "${account.accountId}" connected (address: ${address})`);
 
       // Block until abort signal fires (keeps the channel alive)
       await new Promise<void>((resolve) => {
-        if (signal.aborted) {
+        if (abortSignal.aborted) {
           resolve();
           return;
         }
-        signal.addEventListener("abort", () => resolve(), { once: true });
+        abortSignal.addEventListener("abort", () => resolve(), { once: true });
       });
 
       // Cleanup on abort
-      logger.info(`Stopping XMTP account "${account.accountId}"`);
+      log?.info(`Stopping XMTP account "${account.accountId}"`);
       await client.stop();
       removeClient(account.accountId);
     },
 
     /**
-     * Stop an XMTP account by ID.
+     * Stop an XMTP account.
      */
-    async stopAccount(accountId: string): Promise<void> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    async stopAccount(ctx: any): Promise<void> {
+      const accountId = typeof ctx === "string" ? ctx : ctx.accountId;
       const client = getClient(accountId);
       if (client) {
         await client.stop();
@@ -180,9 +186,8 @@ export const xmtpChannel = {
 function handleInboundMessage(
   msg: InboundXmtpMessage,
   account: ResolvedXmtpAccount,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  dispatch: (envelope: any) => void,
-  logger: { debug: (msg: string) => void },
+  dispatch: ((envelope: unknown) => void) | undefined,
+  logger: { info: (msg: string) => void; debug: (msg: string) => void },
 ): void {
   logger.debug(
     `Inbound XMTP message: ${msg.messageId} from ${msg.senderAddress ?? msg.senderInboxId}`,
@@ -203,7 +208,14 @@ function handleInboundMessage(
     timestamp: msg.sentAt.toISOString(),
   };
 
-  dispatch(envelope);
+  if (dispatch) {
+    dispatch(envelope);
+  } else {
+    // TODO: dispatch not available from runtime — log for now
+    logger.info(
+      `Inbound XMTP (no dispatch): [${msg.senderAddress ?? msg.senderInboxId}] ${msg.text.slice(0, 100)}`,
+    );
+  }
 }
 
 /**
