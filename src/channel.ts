@@ -20,6 +20,8 @@ import { getRuntime } from "./runtime.js";
  * - outbound: message delivery
  */
 export const xmtpChannel = {
+  id: "xmtp" as const,
+
   meta: {
     id: "xmtp" as const,
     label: "XMTP",

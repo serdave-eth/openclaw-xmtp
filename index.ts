@@ -17,14 +17,14 @@ export default function register(api: any): void {
 
   // Register the XMTP channel
   api.registerChannel({
-    ...xmtpChannel,
-
-    configSchema: xmtpChannelConfigSchema,
-    uiHints,
-
-    onboarding: {
-      async run(ctx: Parameters<typeof runOnboarding>[0]) {
-        await runOnboarding(ctx);
+    plugin: {
+      ...xmtpChannel,
+      configSchema: xmtpChannelConfigSchema,
+      uiHints,
+      onboarding: {
+        async run(ctx: Parameters<typeof runOnboarding>[0]) {
+          await runOnboarding(ctx);
+        },
       },
     },
   });

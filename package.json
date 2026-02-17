@@ -40,8 +40,12 @@
       "id": "xmtp",
       "label": "XMTP",
       "selectionLabel": "XMTP (Encrypted Messaging)",
-      "aliases": ["xmtp"]
+      "aliases": ["xmtp"],
+      "blurb": "End-to-end encrypted messaging via the XMTP protocol",
+      "order": 50
     },
-    "installHint": "openclaw plugins install openclaw-xmtp"
+    "install": {
+      "npmSpec": "openclaw-xmtp"
+    }
   }
 }
