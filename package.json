@@ -33,6 +33,9 @@
     "vitest": "^3.0.0"
   },
   "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ],
     "channel": {
       "id": "xmtp",
       "label": "XMTP",
