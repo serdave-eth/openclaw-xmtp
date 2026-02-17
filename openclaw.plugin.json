@@ -1,5 +1,5 @@
 {                                                                                                                                                                                                          
-    "id": "xmtp",                                                                                                                                                                                              
+    "id": "openclaw-xmtp",                                                                                                                                                                                              
     "channels": ["xmtp"],                                                                                                                                                                                    
     "configSchema": {                                                                                                                                                                                          
       "type": "object",                                                                                                                                                                                        
