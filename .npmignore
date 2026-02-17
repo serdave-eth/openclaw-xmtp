@@ -1,0 +1,6 @@
+test/
+.claude/
+.env
+.env.*
+*.test.ts
+vitest.config.ts

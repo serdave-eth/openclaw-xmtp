@@ -1,0 +1,44 @@
+{
+  "name": "openclaw-xmtp",
+  "version": "0.1.0",
+  "description": "XMTP encrypted messaging channel plugin for OpenClaw",
+  "type": "module",
+  "main": "index.ts",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "openclaw",
+    "xmtp",
+    "messaging",
+    "channel",
+    "plugin",
+    "encrypted"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@xmtp/agent-sdk": "^2.2.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0",
+    "vitest": "^3.0.0"
+  },
+  "openclaw": {
+    "channel": {
+      "id": "xmtp",
+      "label": "XMTP",
+      "selectionLabel": "XMTP (Encrypted Messaging)",
+      "aliases": ["xmtp"]
+    },
+    "installHint": "openclaw plugins install openclaw-xmtp"
+  }
+}
