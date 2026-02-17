@@ -1,112 +1,132 @@
+import { listAccountIds, resolveAccount, isAccountConfigured } from "./accounts.js";
 import { createXmtpUser, createXmtpSigner, generateDbEncryptionKey } from "./lib/identity.js";
 import { Agent } from "@xmtp/agent-sdk";
 
-export type OnboardingContext = {
-  prompt: (question: string, options?: string[]) => Promise<string>;
-  print: (message: string) => void;
-  writeConfig: (path: string, value: unknown) => Promise<void>;
-  configPath?: string;
-};
+const channel = "xmtp" as const;
 
 /**
- * Interactive onboarding wizard for `openclaw configure`.
- * Guides the user through XMTP setup.
+ * ChannelOnboardingAdapter for the XMTP channel.
+ * Implements getStatus, configure, and disable as expected by
+ * openclaw/src/commands/onboarding/registry.ts.
  */
-export async function runOnboarding(ctx: OnboardingContext): Promise<void> {
-  ctx.print("\n--- XMTP Channel Configuration ---\n");
+export const xmtpOnboardingAdapter = {
+  channel,
 
-  // Step 1: Choose environment
-  const env = await ctx.prompt("Choose XMTP environment:", [
-    "production",
-    "dev",
-  ]);
-  const xmtpEnv = env === "dev" ? "dev" : "production";
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async getStatus({ cfg }: { cfg: any }) {
+    const xmtpCfg = cfg.channels?.xmtp ?? {};
+    const accountIds = listAccountIds(xmtpCfg);
+    const configured = accountIds.some((id: string) =>
+      isAccountConfigured(resolveAccount(xmtpCfg, id)),
+    );
+    return {
+      channel,
+      configured,
+      statusLines: [`XMTP: ${configured ? "configured" : "needs setup"}`],
+      selectionHint: configured ? "configured" : "not configured",
+      quickstartScore: 0,
+    };
+  },
 
-  // Step 2: Choose key mode
-  const keyMode = await ctx.prompt("How would you like to set up keys?", [
-    "Random (generate new identity)",
-    "Custom (enter existing keys)",
-  ]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async configure({ cfg, prompter }: { cfg: any; prompter: any }) {
+    // Step 1: environment
+    const xmtpEnv = await prompter.select({
+      message: "XMTP environment",
+      options: [
+        { value: "production", label: "Production" },
+        { value: "dev", label: "Dev" },
+      ],
+      initialValue: cfg.channels?.xmtp?.env ?? "production",
+    });
 
-  let walletKey: string;
-  let dbEncryptionKey: string;
+    // Step 2: key mode
+    const keyMode = await prompter.select({
+      message: "How would you like to set up keys?",
+      options: [
+        { value: "random", label: "Generate new identity" },
+        { value: "custom", label: "Enter existing keys" },
+      ],
+    });
 
-  if (keyMode.startsWith("Random")) {
-    // Generate random keys
-    ctx.print("Generating new XMTP identity...");
+    let walletKey: string;
+    let dbEncryptionKey: string;
 
-    const user = createXmtpUser();
-    walletKey = user.key;
-    dbEncryptionKey = generateDbEncryptionKey();
+    if (keyMode === "random") {
+      const progress = prompter.progress("Generating XMTP identity");
+      const user = createXmtpUser();
+      walletKey = user.key;
+      dbEncryptionKey = generateDbEncryptionKey();
 
-    ctx.print(`Wallet key generated: ${walletKey.slice(0, 10)}...`);
-    ctx.print(`DB encryption key generated: ${dbEncryptionKey.slice(0, 10)}...`);
-
-    // Create a temporary agent to get the inbox ID
-    try {
-      const signer = createXmtpSigner(user);
-      const agent = await Agent.create(signer, { env: xmtpEnv });
-      const address = agent.address;
-      ctx.print(`\nYour agent's XMTP address: ${address}`);
-      ctx.print("Share this address so others can message your agent.\n");
-      await agent.stop();
-    } catch {
-      ctx.print(
-        "\nCould not retrieve XMTP address (network unavailable). " +
-          "It will be shown when you start the agent.\n",
-      );
+      try {
+        const signer = createXmtpSigner(user);
+        const agent = await Agent.create(signer, { env: xmtpEnv });
+        progress.stop(`Identity created — address: ${agent.address}`);
+        await agent.stop();
+      } catch {
+        progress.stop("Identity created (address will appear on first start)");
+      }
+    } else {
+      walletKey = await prompter.text({
+        message: "Wallet private key (hex, 0x-prefixed)",
+        validate: (v: string) => (v?.trim() ? undefined : "Required"),
+      });
+      dbEncryptionKey = await prompter.text({
+        message: "DB encryption key (64-char hex or 0x-prefixed)",
+        validate: (v: string) => (v?.trim() ? undefined : "Required"),
+      });
     }
-  } else {
-    // Custom keys
-    walletKey = await ctx.prompt(
-      "Enter wallet private key (hex, 0x-prefixed):",
+
+    // Step 3: DM policy
+    const dmPolicy = await prompter.select({
+      message: "DM policy",
+      options: [
+        { value: "pairing", label: "Pairing", hint: "unknown senders get approval code" },
+        { value: "open", label: "Open", hint: "accept all DMs" },
+        { value: "allowlist", label: "Allowlist", hint: "pre-approved addresses only" },
+        { value: "disabled", label: "Disabled", hint: "ignore all DMs" },
+      ],
+      initialValue: cfg.channels?.xmtp?.dmPolicy ?? "pairing",
+    });
+
+    // Step 4: build updated config
+    const next = {
+      ...cfg,
+      channels: {
+        ...cfg.channels,
+        xmtp: {
+          ...cfg.channels?.xmtp,
+          enabled: true,
+          walletKey,
+          dbEncryptionKey,
+          env: xmtpEnv,
+          dmPolicy,
+          groupPolicy: "open",
+        },
+      },
+    };
+
+    await prompter.note(
+      [
+        "SECURITY: Your config now contains a private key.",
+        "For production, consider env var references:",
+        '  walletKey: "${XMTP_WALLET_KEY}"',
+        '  dbEncryptionKey: "${XMTP_DB_ENCRYPTION_KEY}"',
+        "",
+        "Run `openclaw doctor --fix` to auto-tighten file permissions.",
+      ].join("\n"),
+      "XMTP configured",
     );
-    dbEncryptionKey = await ctx.prompt(
-      "Enter DB encryption key (64-char hex or 0x-prefixed):",
-    );
-  }
 
-  // Step 3: Choose DM policy
-  const dmPolicy = await ctx.prompt("Choose DM policy:", [
-    "pairing (unknown senders get a code to approve)",
-    "open (accept all DMs)",
-    "allowlist (only pre-approved addresses)",
-    "disabled (ignore all DMs)",
-  ]);
+    return { cfg: next };
+  },
 
-  const dmPolicyValue = dmPolicy.split(" ")[0] as
-    | "pairing"
-    | "open"
-    | "allowlist"
-    | "disabled";
-
-  // Step 4: Write config
-  const config = {
-    enabled: true,
-    walletKey,
-    dbEncryptionKey,
-    env: xmtpEnv,
-    dmPolicy: dmPolicyValue,
-    groupPolicy: "open" as const,
-  };
-
-  await ctx.writeConfig("channels.xmtp", config);
-
-  ctx.print("\nXMTP channel configured successfully!");
-  ctx.print("");
-  ctx.print("SECURITY NOTES:");
-  ctx.print(
-    '  Your config file contains a private key. For production use, consider',
-  );
-  ctx.print(
-    '  using env var references instead:',
-  );
-  ctx.print('    walletKey: "${XMTP_WALLET_KEY}"');
-  ctx.print('    dbEncryptionKey: "${XMTP_DB_ENCRYPTION_KEY}"');
-  ctx.print("");
-  ctx.print(
-    "  Run `openclaw doctor --fix` to auto-tighten file permissions.",
-  );
-  ctx.print("");
-  ctx.print("Start your agent with: openclaw start");
-}
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  disable: (cfg: any) => ({
+    ...cfg,
+    channels: {
+      ...cfg.channels,
+      xmtp: { ...cfg.channels?.xmtp, enabled: false },
+    },
+  }),
+};

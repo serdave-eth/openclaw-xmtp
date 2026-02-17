@@ -1,6 +1,6 @@
 import { xmtpChannel } from "./src/channel.js";
 import { commands } from "./src/commands.js";
-import { runOnboarding } from "./src/onboarding.js";
+import { xmtpOnboardingAdapter } from "./src/onboarding.js";
 import { setRuntime } from "./src/runtime.js";
 import { xmtpChannelConfigSchema, uiHints } from "./src/config-schema.js";
 
@@ -21,11 +21,7 @@ export default function register(api: any): void {
       ...xmtpChannel,
       configSchema: xmtpChannelConfigSchema,
       uiHints,
-      onboarding: {
-        async run(ctx: Parameters<typeof runOnboarding>[0]) {
-          await runOnboarding(ctx);
-        },
-      },
+      onboarding: xmtpOnboardingAdapter,
     },
   });
 
@@ -44,7 +40,7 @@ export default function register(api: any): void {
 // Named exports for direct usage
 export { xmtpChannel } from "./src/channel.js";
 export { commands } from "./src/commands.js";
-export { runOnboarding } from "./src/onboarding.js";
+export { xmtpOnboardingAdapter } from "./src/onboarding.js";
 export { xmtpChannelConfigSchema, uiHints } from "./src/config-schema.js";
 export type {
   XmtpChannelConfig,
