@@ -1,4 +1,9 @@
-{
-  "id": "xmtp",
-  "channels": ["xmtp"]
-}
+{                                                                                                                                                                                                          
+    "id": "xmtp",                                                                                                                                                                                              
+    "channels": ["xmtp"],                                                                                                                                                                                    
+    "configSchema": {                                                                                                                                                                                          
+      "type": "object",                                                                                                                                                                                        
+      "additionalProperties": false,
+      "properties": {}
+    }
+  }
