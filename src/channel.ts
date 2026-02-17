@@ -36,15 +36,14 @@ export const xmtpChannel = {
   },
 
   config: {
-    listAccountIds(config: XmtpChannelConfig): string[] {
-      return listAccountIds(config);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    listAccountIds(cfg: any): string[] {
+      return listAccountIds(cfg.channels?.xmtp ?? {});
     },
 
-    resolveAccount(
-      config: XmtpChannelConfig,
-      accountId: string,
-    ): ResolvedXmtpAccount {
-      return resolveAccount(config, accountId);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    resolveAccount(cfg: any, accountId: string): ResolvedXmtpAccount {
+      return resolveAccount(cfg.channels?.xmtp ?? {}, accountId);
     },
 
     isAccountConfigured(account: ResolvedXmtpAccount): boolean {
