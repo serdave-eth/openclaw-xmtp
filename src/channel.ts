@@ -27,6 +27,8 @@ export const xmtpChannel = {
     label: "XMTP",
     selectionLabel: "XMTP (Encrypted Messaging)",
     aliases: ["xmtp"],
+    docsPath: "/channels/xmtp",
+    blurb: "End-to-end encrypted messaging via the XMTP protocol.",
   },
 
   capabilities: {
