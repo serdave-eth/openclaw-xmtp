@@ -33,6 +33,8 @@ All messages are end-to-end encrypted. The plugin uses only the public [`@xmtp/a
 
 > **Note:** This plugin is not yet published to npm. Install from a local clone.
 
+In your openclaw root directory:
+
 ```bash
 git clone https://github.com/your-org/openclaw-xmtp.git
 cd openclaw-xmtp
