@@ -1,24 +1,14 @@
-/**
- * Module-level getter/setter for PluginRuntime reference.
- * Same pattern used by all OpenClaw channel plugins.
- */
+import type { PluginRuntime } from "openclaw/plugin-sdk";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let _runtime: any = null;
+let runtime: PluginRuntime | null = null;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function setRuntime(runtime: any): void {
-  _runtime = runtime;
+export function setXmtpRuntime(next: PluginRuntime): void {
+  runtime = next;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function getRuntime(): any {
-  if (!_runtime) {
-    throw new Error("XMTP plugin runtime not initialized");
+export function getXmtpRuntime(): PluginRuntime {
+  if (!runtime) {
+    throw new Error("XMTP runtime not initialized");
   }
-  return _runtime;
-}
-
-export function hasRuntime(): boolean {
-  return _runtime !== null;
+  return runtime;
 }
